@@ -1,0 +1,93 @@
+FUNCTION_BLOCK robot_sensores
+VAR_INPUT
+	left_sensor : REAL;
+	center_sensor : REAL;
+	right_sensor : REAL;
+	shroom : REAL;
+	velocity : REAL;
+END_VAR
+VAR_OUTPUT 
+	robot_action : REAL;
+	wheels_angle : REAL;
+END_VAR
+FUZZIFY left_sensor
+	TERM near := (1,1)(2,1)(3,0.8)(4,0.5)(5,0.3)(6,0)(7,0)(8,0)(9,0)(10,0);
+	TERM medium := (1,0)(2,0)(3,0.3)(4,0.5)(5,1)(6,1)(7,0.5)(8,0.3)(9,0.1)(10,0);
+	TERM far := (1,0)(2,0)(3,0)(4,0)(5,0)(6,0)(7,0)(8,0)(9,0.5)(10,1);
+END_FUZZIFY
+FUZZIFY center_sensor
+	TERM near := (1,1)(2,1)(3,0.8)(4,0.5)(5,0.3)(6,0)(7,0)(8,0)(9,0)(10,0);
+	TERM medium := (1,0)(2,0)(3,0.3)(4,0.5)(5,1)(6,1)(7,0.5)(8,0.3)(9,0.1)(10,0);
+	TERM far := (1,0)(2,0)(3,0)(4,0)(5,0.3)(6,0.5)(7,0.8)(8,1)(9,1)(10,1);
+END_FUZZIFY
+FUZZIFY right_sensor 
+	TERM near := (1,1)(2,1)(3,0.8)(4,0.5)(5,0.3)(6,0)(7,0)(8,0)(9,0)(10,0);
+	TERM medium := (1,0)(2,0)(3,0.3)(4,0.5)(5,1)(6,1)(7,0.5)(8,0.3)(9,0.1)(10,0);
+	TERM far := (1,0)(2,0)(3,0)(4,0)(5,0)(6,0)(7,0)(8,0)(9,0.5)(10,1);
+END_FUZZIFY
+FUZZIFY velocity 
+//THIS COMES IN m/s (3 speeds, slow 3 cm/s ,medium 2 cm/s ,high 1cm/s)
+	TERM stop := (0.1,0)(0.2,0)(0.3,0);
+	TERM slow := (0.1,1)(0.2,0)(0.3,0);
+	TERM medium := (0.1,0)(0.2,1)(0.3,0);
+	TERM fast := (0.1,0)(0.2,0)(0.3,1);
+END_FUZZIFY
+FUZZIFY shroom
+	TERM poisonous := 0 ;
+	TERM edible := 1 ;
+END_FUZZIFY
+DEFUZZIFY wheels_angle
+	TERM strong_left := -45;
+	TERM left := -22.5;
+	TERM center := 0;
+	TERM right := 22.5;
+	TERM strong_right := 45;
+	METHOD : COGS;
+	DEFAULT := 0;
+END_DEFUZZIFY
+DEFUZZIFY robot_action
+	TERM no_action := 0;
+	TERM destroy := -100;
+	TERM pick_up := 100;
+	METHOD: COGS;
+	DEFAULT := 50;
+END_DEFUZZIFY
+RULEBLOCK move_robot
+	AND : MIN;
+	ACT : MIN;
+	ACCU : MAX;
+	//All sensors and active at the same time at the same condition. It will opt for center
+	RULE 1 : IF left_sensor IS near AND center_sensor IS near AND right_sensor IS near THEN wheels_angle IS center;
+	RULE 2 : IF left_sensor IS medium AND center_sensor IS medium AND right_sensor IS medium THEN wheels_angle IS center;
+	RULE 3 : IF left_sensor IS far AND center_sensor IS far AND right_sensor IS far THEN wheels_angle IS center;
+	//One sensor senses near and the others not near
+	RULE 4 : IF left_sensor IS near AND right_sensor IS NOT near AND center_sensor IS NOT near THEN wheels_angle IS strong_left;
+	RULE 5 : IF right_sensor IS near AND left_sensor IS NOT near AND center_sensor IS NOT near THEN wheels_angle IS strong_right;
+	RULE 6 : IF center_sensor IS near AND left_sensor IS NOT near AND right_sensor IS NOT near THEN wheels_angle IS center;
+	//Left and Right senses near at the same time as Center
+	RULE 7 : IF left_sensor IS near AND center_sensor IS near AND right_sensor IS NOT near THEN wheels_angle IS left;
+	RULE 8 : IF right_sensor IS near AND center_sensor IS near AND left_sensor IS NOT near THEN wheels_angle IS right;
+	//One sensor senses medium and the others not near
+	RULE 9 : IF left_sensor IS medium AND right_sensor IS NOT medium AND center_sensor IS NOT medium THEN wheels_angle IS strong_left;
+	RULE 10 : IF right_sensor IS medium AND left_sensor IS NOT medium AND center_sensor IS NOT medium THEN wheels_angle IS strong_right;
+	RULE 11: IF center_sensor IS medium AND left_sensor IS NOT medium AND right_sensor IS NOT medium THEN wheels_angle IS center;
+	//Left and Right senses medium at the same time as Center
+	RULE 12: IF left_sensor IS medium AND center_sensor IS medium AND right_sensor IS NOT near THEN wheels_angle IS left;
+	RULE 13: IF right_sensor IS medium AND center_sensor IS medium AND left_sensor IS NOT near THEN wheels_angle IS right;
+	//One sensor senses far and the others not near
+	RULE 14: IF left_sensor IS far AND right_sensor IS NOT far AND center_sensor IS NOT far THEN wheels_angle IS strong_left;
+	RULE 15 : IF right_sensor IS far AND left_sensor IS NOT far AND center_sensor IS NOT far THEN wheels_angle IS strong_right;
+	RULE 16 : IF center_sensor IS far AND left_sensor IS NOT far AND right_sensor IS NOT far THEN wheels_angle IS center;
+	//Left and Right senses far at the same time as Center	
+	RULE 17 : IF left_sensor IS far AND center_sensor IS far AND right_sensor IS NOT far THEN wheels_angle IS left;
+	RULE 18 : IF right_sensor IS far AND center_sensor IS far AND left_sensor IS NOT far THEN wheels_angle IS right;
+	//Shroom decision
+	RULE 19 : IF shroom IS poisonous THEN robot_action IS destroy;
+	RULE 20 : IF shroom IS edible THEN robot_action IS pick_up;
+	//If a sensor is active, take its turn
+	RULE 21 : IF left_sensor IS medium OR left_sensor IS far OR left_sensor IS near THEN wheels_angle IS left;
+	RULE 21 : IF right_sensor IS medium OR right_sensor IS far OR right_sensor IS near THEN wheels_angle IS right;
+	RULE 21 : IF center_sensor IS medium OR center_sensor IS far OR center_sensor IS near THEN wheels_angle IS center;
+END_RULEBLOCK
+
+END_FUNCTION_BLOCK
